@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FieldTrack" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>FieldTrack – Digitide Solutions Limited</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <!-- Google Identity Services for OAuth -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    :root {
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: #1e2d45;
+      --accent: #00d4ff;
+      --accent2: #7c3aed;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 16px;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    body {
+      font-family:'Space Grotesk',sans-serif;
+      background:var(--bg); color:var(--text);
+      min-height:100dvh; display:flex; flex-direction:column; overflow-x:hidden;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; z-index:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%,rgba(0,212,255,0.07) 0%,transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%,rgba(124,58,237,0.07) 0%,transparent 60%);
+      pointer-events:none;
+    }
+
+    /* ── Header ── */
+    .header {
+      position:sticky; top:0; z-index:100;
+      background:rgba(10,15,30,0.85); backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      padding:14px 20px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .header-brand { display:flex; align-items:center; gap:10px; }
+    .brand-dot {
+      width:32px; height:32px; border-radius:10px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:flex; align-items:center; justify-content:center; font-size:16px;
+    }
+    .brand-name { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
+    .brand-sub  { font-size:10px; color:var(--muted); font-weight:400; letter-spacing:1px; text-transform:uppercase; }
+    .header-time {
+      font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--accent);
+      background:rgba(0,212,255,0.08); padding:6px 12px; border-radius:8px;
+      border:1px solid rgba(0,212,255,0.15);
+    }
+
+    /* ── Screens ── */
+    .screen { display:none; flex-direction:column; flex:1; position:relative; z-index:1; }
+    .screen.active { display:flex; }
+
+    /* ── Loading screen ── */
+    .loading-wrap {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:20px;
+    }
+    .loading-logo { font-size:48px; animation:bounce 1s infinite alternate; }
+    @keyframes bounce { from{transform:translateY(0)} to{transform:translateY(-12px)} }
+    .loading-text { color:var(--muted); font-size:14px; }
+
+    /* ── Login screen ── */
+    .login-wrap {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; padding:24px 20px; gap:28px;
+    }
+    .login-hero { text-align:center; }
+    .login-hero h1 { font-size:28px; font-weight:700; letter-spacing:-0.5px; margin-bottom:8px; }
+    .login-hero p  { color:var(--muted); font-size:14px; line-height:1.6; }
+    .login-hero .accent { color:var(--accent); }
+
+    .login-card {
+      width:100%; max-width:400px;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:28px 24px;
+      display:flex; flex-direction:column; gap:20px; align-items:center;
+    }
+    .google-signin-wrap {
+      width:100%; display:flex; flex-direction:column; align-items:center; gap:12px;
+    }
+    .google-btn {
+      width:100%; max-width:320px; padding:14px 20px;
+      background:#fff; border:1.5px solid #ddd; border-radius:12px;
+      display:flex; align-items:center; justify-content:center; gap:12px;
+      font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;
+      color:#1a1a1a; cursor:pointer; transition:all 0.2s;
+      box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    }
+    .google-btn:hover { background:#f8f8f8; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+    .google-btn:active { transform:scale(0.97); }
+    .google-btn img { width:22px; height:22px; }
+    .signin-divider {
+      font-size:12px; color:var(--muted); text-align:center;
+      display:flex; align-items:center; gap:10px; width:100%;
+    }
+    .signin-divider::before,.signin-divider::after {
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+
+    /* Employee ID field (shown after Google sign-in) */
+    .field-label { font-size:12px; font-weight:600; color:var(--muted); letter-spacing:0.8px; text-transform:uppercase; margin-bottom:6px; }
+    .field-input {
+      width:100%; background:var(--bg); border:1.5px solid var(--border);
+      border-radius:12px; padding:14px 16px;
+      color:var(--text); font-family:'Space Grotesk',sans-serif;
+      font-size:15px; outline:none; transition:border-color 0.2s;
+    }
+    .field-input:focus { border-color:var(--accent); }
+    .field-input::placeholder { color:var(--muted); }
+
+    /* Google user preview */
+    .guser-preview {
+      display:flex; align-items:center; gap:12px;
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:12px; padding:12px 16px; width:100%;
+    }
+    .guser-pic {
+      width:40px; height:40px; border-radius:50%;
+      border:2px solid var(--accent); object-fit:cover; flex-shrink:0;
+    }
+    .guser-pic-fallback {
+      width:40px; height:40px; border-radius:50%;
+      background:linear-gradient(135deg,var(--accent2),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:16px; color:#fff; flex-shrink:0;
+    }
+    .guser-info { flex:1; min-width:0; }
+    .guser-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .guser-email { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .guser-verified { font-size:11px; color:var(--success); margin-top:1px; }
+
+    /* ── Buttons ── */
+    .btn {
+      width:100%; padding:16px; border:none; border-radius:12px;
+      font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;
+      cursor:pointer; transition:all 0.2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-primary { background:linear-gradient(135deg,var(--accent),#0099cc); color:#000; }
+    .btn-primary:active { transform:scale(0.97); }
+    .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-punch-in  { background:linear-gradient(135deg,var(--success),#059669); color:#fff; font-size:17px; padding:20px; border-radius:14px; letter-spacing:0.3px; }
+    .btn-punch-out { background:linear-gradient(135deg,var(--danger),#dc2626);  color:#fff; font-size:17px; padding:20px; border-radius:14px; letter-spacing:0.3px; }
+    .btn-punch-in:active,.btn-punch-out:active { transform:scale(0.97); }
+    .btn-punch-in:disabled,.btn-punch-out:disabled { opacity:0.4; cursor:not-allowed; }
+
+    /* ── Dashboard ── */
+    .dash-wrap { flex:1; display:flex; flex-direction:column; padding:20px; gap:20px; overflow-y:auto; }
+    .engineer-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); padding:20px;
+      display:flex; align-items:center; gap:16px;
+    }
+    .avatar {
+      width:52px; height:52px; border-radius:14px;
+      background:linear-gradient(135deg,var(--accent2),var(--accent));
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; font-weight:700; color:#fff; flex-shrink:0; overflow:hidden;
+    }
+    .avatar img { width:100%; height:100%; object-fit:cover; border-radius:14px; }
+    .eng-info { flex:1; min-width:0; }
+    .eng-name { font-size:17px; font-weight:700; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .eng-id   { font-size:12px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+    .status-pill { padding:6px 12px; border-radius:20px; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; }
+    .status-in  { background:rgba(16,185,129,0.15); color:var(--success); border:1px solid rgba(16,185,129,0.3); }
+    .status-out { background:rgba(100,116,139,0.15); color:var(--muted);   border:1px solid rgba(100,116,139,0.2); }
+
+    /* ── State checking banner ── */
+    .state-banner {
+      background:var(--surface2); border:1px solid var(--border);
+      border-radius:12px; padding:14px 16px;
+      display:flex; align-items:center; gap:10px;
+      font-size:13px; color:var(--muted);
+    }
+    .state-banner.checking { border-color:rgba(0,212,255,0.2); color:var(--accent); }
+    .state-banner.punched-in { border-color:rgba(16,185,129,0.3); color:var(--success); background:rgba(16,185,129,0.06); }
+
+    /* ── Info grid ── */
+    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .info-tile { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; }
+    .info-tile-label { font-size:11px; color:var(--muted); font-weight:500; letter-spacing:0.5px; text-transform:uppercase; margin-bottom:6px; }
+    .info-tile-val   { font-size:18px; font-weight:700; color:var(--text); font-family:'JetBrains Mono',monospace; }
+    .info-tile-sub   { font-size:11px; color:var(--muted); margin-top:2px; }
+
+    /* ── Camera ── */
+    .camera-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+    .camera-header {
+      padding:14px 18px; border-bottom:1px solid var(--border);
+      font-size:13px; font-weight:600; color:var(--muted);
+      letter-spacing:0.5px; text-transform:uppercase;
+      display:flex; align-items:center; gap:8px;
+    }
+    .camera-dot { width:8px; height:8px; border-radius:50%; background:var(--danger); animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    #videoEl { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:#000; }
+    #photoPreview { width:100%; aspect-ratio:4/3; object-fit:cover; display:none; }
+    .camera-controls { padding:14px 16px; display:flex; gap:10px; }
+    .btn-cam { flex:1; padding:12px; border:none; border-radius:10px; font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+    .btn-snap   { background:var(--accent); color:#000; }
+    .btn-retake { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+    .btn-cam:active { transform:scale(0.96); }
+
+    /* ── GPS ── */
+    .gps-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; }
+    .gps-header { font-size:13px; font-weight:600; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .gps-coords {
+      font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--accent);
+      background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.12);
+      border-radius:10px; padding:12px 14px; margin-bottom:12px; min-height:44px;
+      display:flex; align-items:center;
+    }
+    .gps-acc { font-size:12px; color:var(--muted); }
+    .btn-gps {
+      width:100%; padding:13px; border:none; border-radius:10px;
+      background:var(--surface2); color:var(--text);
+      font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600;
+      border:1px solid var(--border); cursor:pointer; transition:all 0.2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    .btn-gps:active { transform:scale(0.97); }
+    .btn-gps.acquired { border-color:rgba(16,185,129,0.4); color:var(--success); background:rgba(16,185,129,0.08); }
+
+    /* ── History ── */
+    .history-section { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+    .history-header { padding:14px 18px; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; color:var(--muted); letter-spacing:0.5px; text-transform:uppercase; }
+    .history-list { max-height:200px; overflow-y:auto; }
+    .history-item { padding:12px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; font-size:13px; }
+    .history-item:last-child { border-bottom:none; }
+    .hist-type { width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+    .hist-in  { background:rgba(16,185,129,0.15); }
+    .hist-out { background:rgba(239,68,68,0.15); }
+    .hist-info { flex:1; }
+    .hist-action { font-weight:600; }
+    .hist-time   { color:var(--muted); font-size:11px; font-family:'JetBrains Mono',monospace; }
+    .hist-empty  { padding:24px; text-align:center; color:var(--muted); font-size:13px; }
+
+    /* ── Toast ── */
+    .toast {
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px);
+      background:var(--surface2); border:1px solid var(--border);
+      color:var(--text); padding:12px 20px; border-radius:40px;
+      font-size:14px; font-weight:500; z-index:9999;
+      transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      white-space:nowrap; max-width:90vw;
+      display:flex; align-items:center; gap:8px;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); }
+    .toast.success { border-color:rgba(16,185,129,0.4); }
+    .toast.error   { border-color:rgba(239,68,68,0.4); }
+
+    /* ── Spinner ── */
+    .spinner {
+      width:18px; height:18px;
+      border:2px solid rgba(255,255,255,0.2); border-top-color:currentColor;
+      border-radius:50%; animation:spin 0.7s linear infinite; display:inline-block;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── Section label ── */
+    .section-label { font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); padding:0 2px; }
+
+    /* ── Logout ── */
+    .logout-btn {
+      background:none; border:1px solid var(--border); color:var(--muted);
+      padding:8px 14px; border-radius:8px;
+      font-size:12px; font-family:'Space Grotesk',sans-serif; cursor:pointer; transition:all 0.2s;
+    }
+    .logout-btn:active { border-color:var(--danger); color:var(--danger); }
+
+    canvas { display:none; }
+
+    /* ── Success overlay ── */
+    .success-overlay {
+      position:fixed; inset:0; z-index:200;
+      background:rgba(0,0,0,0.8); backdrop-filter:blur(8px);
+      display:none; align-items:center; justify-content:center;
+    }
+    .success-overlay.show { display:flex; }
+    .success-card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:24px; padding:40px 32px;
+      text-align:center; max-width:320px; width:90%;
+      animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes popIn { from{transform:scale(0.7);opacity:0} to{transform:scale(1);opacity:1} }
+    .success-icon  { font-size:56px; margin-bottom:16px; }
+    .success-title { font-size:22px; font-weight:700; margin-bottom:8px; }
+    .success-sub   { color:var(--muted); font-size:14px; line-height:1.5; }
+    .success-meta  { margin-top:20px; padding:14px; background:var(--bg); border-radius:12px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); line-height:1.8; text-align:left; }
+    .btn-done { margin-top:20px; width:100%; padding:14px; background:linear-gradient(135deg,var(--accent),#0099cc); border:none; border-radius:12px; color:#000; font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; cursor:pointer; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="header">
+  <div class="header-brand">
+    <div class="brand-dot">⚡</div>
+    <div>
+      <div class="brand-name">FieldTrack</div>
+      <div class="brand-sub">Digitide Solutions Limited</div>
+    </div>
+  </div>
+  <div id="liveTime" class="header-time">--:--:--</div>
+</header>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: LOADING                           -->
+<!-- ══════════════════════════════════════════ -->
+<section class="screen active" id="screenLoading">
+  <div class="loading-wrap">
+    <div class="loading-logo">⚡</div>
+    <div class="loading-text">Initialising FieldTrack…</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: LOGIN (Google OAuth)              -->
+<!-- ══════════════════════════════════════════ -->
+<section class="screen" id="screenLogin">
+  <div class="login-wrap">
+    <div class="login-hero">
+      <h1>Welcome 👋</h1>
+      <p>Sign in with your Google account<br/>to mark attendance for <span class="accent">Digitide Solutions Limited</span></p>
+    </div>
+
+    <div class="login-card">
+      <!-- Step 1: Google sign-in button -->
+      <div id="stepGoogle" class="google-signin-wrap">
+        <button class="google-btn" onclick="triggerGoogleSignIn()">
+          <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" />
+          Continue with Google
+        </button>
+        <div class="signin-divider">Verified identity required</div>
+        <p style="font-size:12px;color:var(--muted);text-align:center;line-height:1.6;">
+          Your Google account confirms your identity.<br/>No passwords stored in FieldTrack.
+        </p>
+      </div>
+
+      <!-- Step 2: After Google sign-in, enter Employee ID + Zone -->
+      <div id="stepDetails" style="display:none;width:100%;display:none;flex-direction:column;gap:16px;">
+        <div id="guserPreview" class="guser-preview">
+          <!-- Populated by JS -->
+        </div>
+        <div>
+          <div class="field-label">Employee ID</div>
+          <input class="field-input" id="empId" type="text" placeholder="e.g. TPO-0042" autocomplete="off" />
+        </div>
+        <div>
+          <div class="field-label">Zone / Location</div>
+          <input class="field-input" id="empZone" type="text" placeholder="e.g. Bhubaneswar North" autocomplete="off" />
+        </div>
+        <button class="btn btn-primary" id="btnLogin" onclick="doLogin()">
+          Continue to Dashboard →
+        </button>
+        <button style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Space Grotesk',sans-serif;" onclick="resetGoogleSignIn()">
+          ← Use a different account
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- SCREEN: DASHBOARD                         -->
+<!-- ══════════════════════════════════════════ -->
+<section class="screen" id="screenDash">
+  <div class="dash-wrap">
+
+    <!-- Engineer identity card -->
+    <div class="engineer-card" id="engCard">
+      <div class="avatar" id="engAvatar">?</div>
+      <div class="eng-info">
+        <div class="eng-name" id="engNameDisplay">–</div>
+        <div class="eng-id"   id="engIdDisplay">–</div>
+      </div>
+      <div class="status-pill status-out" id="statusPill">Punched Out</div>
+    </div>
+
+    <!-- Punch state banner (shown while checking / if already IN) -->
+    <div class="state-banner checking" id="stateBanner" style="display:none;">
+      <span class="spinner" id="bannerSpinner"></span>
+      <span id="bannerText">Checking today's attendance status…</span>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="info-grid">
+      <div class="info-tile">
+        <div class="info-tile-label">📅 Today</div>
+        <div class="info-tile-val" id="statDate">–</div>
+        <div class="info-tile-sub" id="statDay">–</div>
+      </div>
+      <div class="info-tile">
+        <div class="info-tile-label">⏱ Session</div>
+        <div class="info-tile-val" id="statSession">–</div>
+        <div class="info-tile-sub" id="statPunchIn">Not punched in</div>
+      </div>
+      <div class="info-tile">
+        <div class="info-tile-label">📍 Punches</div>
+        <div class="info-tile-val" id="statPunches">0</div>
+        <div class="info-tile-sub">Today</div>
+      </div>
+      <div class="info-tile">
+        <div class="info-tile-label">🌐 Zone</div>
+        <div class="info-tile-val" id="statZone" style="font-size:13px;margin-top:4px">–</div>
+        <div class="info-tile-sub">Assigned area</div>
+      </div>
+    </div>
+
+    <!-- Selfie -->
+    <div class="section-label">📸 Selfie Verification</div>
+    <div class="camera-section">
+      <div class="camera-header">
+        <div class="camera-dot"></div> Live Camera — Front Facing
+      </div>
+      <video id="videoEl" autoplay playsinline muted></video>
+      <img id="photoPreview" alt="Captured selfie" />
+      <canvas id="snapCanvas"></canvas>
+      <div class="camera-controls">
+        <button class="btn-cam btn-snap"   id="btnSnap"   onclick="capturePhoto()">📷 Capture Selfie</button>
+        <button class="btn-cam btn-retake" id="btnRetake" onclick="retakePhoto()" style="display:none">🔄 Retake</button>
+      </div>
+    </div>
+
+    <!-- GPS -->
+    <div class="section-label">📡 GPS Location</div>
+    <div class="gps-section">
+      <div class="gps-header"><span>📡</span> Location Coordinates</div>
+      <div class="gps-coords" id="gpsDisplay">Tap below to acquire GPS…</div>
+      <div class="gps-acc"    id="gpsAcc"></div>
+      <br/>
+      <button class="btn-gps" id="btnGps" onclick="getGPS()">📍 Acquire My Location</button>
+    </div>
+
+    <!-- Punch actions -->
+    <div class="section-label">✅ Mark Attendance</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <button class="btn btn-punch-in"  id="btnPunchIn"  onclick="doPunch('IN')"  disabled>✅ &nbsp;Punch IN</button>
+      <button class="btn btn-punch-out" id="btnPunchOut" onclick="doPunch('OUT')" disabled>🔴 &nbsp;Punch OUT</button>
+    </div>
+
+    <!-- Today's log -->
+    <div class="section-label">📋 Today's Log</div>
+    <div class="history-section">
+      <div class="history-header">Attendance History</div>
+      <div class="history-list" id="historyList">
+        <div class="hist-empty">No records yet today</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding-bottom:12px;">
+      <button class="logout-btn" onclick="doLogout()">← Sign Out</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Success overlay ── -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon"  id="successIcon">✅</div>
+    <div class="success-title" id="successTitle">Punch IN Recorded</div>
+    <div class="success-sub"   id="successSub">Your attendance has been saved successfully.</div>
+    <div class="success-meta"  id="successMeta"></div>
+    <button class="btn-done" onclick="closeSuccess()">Done</button>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION — fill these in before deploying
+// ═══════════════════════════════════════════════════════════
+const APPS_SCRIPT_URL   = 'https://script.google.com/macros/s/AKfycbzIuuq-U5_dE1KjzACQ403sfZScZiVPqEnoavShds0EFmNi6i1ZJKtjzLToHfca7-nSsw/exec';
+const GOOGLE_CLIENT_ID  = '876656984570-ufo1njf6qr99nq8il9mr29naptbnnppo.apps.googleusercontent.com';
+const AUTH_TTL_MS       = 60 * 60 * 1000; // 1 hour session validity  // from console.cloud.google.com
+// ═══════════════════════════════════════════════════════════
+
+// ── App state ──
+let state = {
+  googleUser: null,   // { name, email, picture, sub }
+  user: null,         // { id, name, email, zone, picture }
+  photoBlob: null,
+  photoDataURL: null,
+  gps: null,
+  stream: null,
+  punchedIn: false,
+  punchInTime: null,
+  punchCount: 0,
+  sessionTimer: null,
+  history: []
+};
+
+// ── Live clock ──
+function startClock() {
+  const tick = () => {
+    document.getElementById('liveTime').textContent =
+      new Date().toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+  };
+  tick(); setInterval(tick, 1000);
+}
+startClock();
+
+// ── Screen nav ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── Toast ──
+function toast(msg, type='', duration=3500) {
+  const el = document.getElementById('toast');
+  el.innerHTML = msg; el.className = 'toast show ' + type;
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ══════════════════════════════════════════
+//  GOOGLE OAUTH
+// ══════════════════════════════════════════
+
+const AUTH_TTL_MS = 60 * 60 * 1000; // 1 hour — re-auth required after this
+
+function initGoogleSignIn() {
+  if (typeof google === 'undefined') {
+    setTimeout(initGoogleSignIn, 500);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+    auto_select: false,
+    cancel_on_tap_outside: false
+  });
+
+  // ── Check for valid saved session in localStorage (survives browser close) ──
+  const rawSession = localStorage.getItem('ft_session');
+  const rawUser    = localStorage.getItem('ft_user');
+
+  if (rawSession && rawUser) {
+    try {
+      const session = JSON.parse(rawSession);
+      const ageMs   = Date.now() - (session.savedAt || 0);
+      if (ageMs < AUTH_TTL_MS) {
+        // Still within 1 hour — auto-login, no Google prompt needed
+        state.googleUser = session.googleUser;
+        state.user       = JSON.parse(rawUser);
+        setupDash();
+        startCamera();
+        showScreen('screenDash');
+        checkPunchStatus();
+        return;
+      } else {
+        // Session expired — force re-authentication
+        localStorage.removeItem('ft_session');
+        toast('🔒 Session expired. Please sign in again.', '', 4000);
+      }
+    } catch(e) {
+      localStorage.removeItem('ft_session');
+    }
+  }
+
+  showScreen('screenLogin');
+}
+
+function triggerGoogleSignIn() {
+  if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE') {
+    // ── DEMO MODE: skip OAuth, use mock user ──
+    state.googleUser = { name:'Demo Engineer', email:'demo@fieldtrack.app', picture:'', sub:'demo-001' };
+    showGUserPreview();
+    return;
+  }
+  google.accounts.id.prompt((notification) => {
+    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+      // Fallback: show One Tap popup manually failed — open popup
+      google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'profile email',
+        callback: () => {}
+      }).requestAccessToken();
+    }
+  });
+}
+
+function handleGoogleCredential(response) {
+  try {
+    const parts   = response.credential.split('.');
+    const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    state.googleUser = {
+      name:    payload.name,
+      email:   payload.email,
+      picture: payload.picture || '',
+      sub:     payload.sub
+    };
+    // Save session to localStorage with timestamp — persists across browser close
+    // Session is valid for AUTH_TTL_MS (1 hour)
+    saveSession();
+    showGUserPreview();
+  } catch(e) {
+    toast('❌ Google sign-in failed. Please retry.', 'error');
+  }
+}
+
+// Save Google session with timestamp to localStorage
+function saveSession() {
+  if (!state.googleUser) return;
+  localStorage.setItem('ft_session', JSON.stringify({
+    googleUser: state.googleUser,
+    savedAt:    Date.now()
+  }));
+}
+
+// Save session with timestamp to localStorage
+function saveSession() {
+  if (!state.googleUser) return;
+  localStorage.setItem('ft_session', JSON.stringify({
+    googleUser: state.googleUser,
+    savedAt: Date.now()
+  }));
+}
+
+function showGUserPreview() {
+  const u = state.googleUser;
+  const picHtml = u.picture
+    ? `<img class="guser-pic" src="${u.picture}" alt="profile" />`
+    : `<div class="guser-pic-fallback">${u.name.charAt(0)}</div>`;
+  document.getElementById('guserPreview').innerHTML = `
+    ${picHtml}
+    <div class="guser-info">
+      <div class="guser-name">${u.name}</div>
+      <div class="guser-email">${u.email}</div>
+      <div class="guser-verified">✅ Google Verified</div>
+    </div>
+  `;
+  // Pre-fill saved employee ID if exists
+  const saved = localStorage.getItem('ft_user');
+  if (saved) {
+    try {
+      const su = JSON.parse(saved);
+      if (su.email === u.email) {
+        document.getElementById('empId').value   = su.id;
+        document.getElementById('empZone').value = su.zone;
+      }
+    } catch(e) {}
+  }
+  document.getElementById('stepGoogle').style.display  = 'none';
+  document.getElementById('stepDetails').style.display = 'flex';
+}
+
+function resetGoogleSignIn() {
+  state.googleUser = null;
+  localStorage.removeItem('ft_session');
+  document.getElementById('stepGoogle').style.display  = 'flex';
+  document.getElementById('stepDetails').style.display = 'none';
+}
+
+// ══════════════════════════════════════════
+//  LOGIN / LOGOUT
+// ══════════════════════════════════════════
+
+function doLogin() {
+  if (!state.googleUser) { toast('⚠️ Please sign in with Google first', 'error'); return; }
+  const id   = document.getElementById('empId').value.trim();
+  const zone = document.getElementById('empZone').value.trim();
+  if (!id || !zone) { toast('⚠️ Please enter Employee ID and Zone', 'error'); return; }
+
+  state.user = {
+    id,
+    name:    state.googleUser.name,
+    email:   state.googleUser.email,
+    picture: state.googleUser.picture,
+    zone
+  };
+  localStorage.setItem('ft_user', JSON.stringify(state.user));
+  saveSession(); // refresh session timestamp on every login
+
+  setupDash();
+  startCamera();
+  showScreen('screenDash');
+  checkPunchStatus();
+}
+
+function doLogout() {
+  stopCamera();
+  clearInterval(state.sessionTimer);
+  if (typeof google !== 'undefined') {
+    google.accounts.id.disableAutoSelect();
+  }
+  localStorage.removeItem('ft_session');
+  state = { ...state,
+    googleUser:null, user:null, photoBlob:null, photoDataURL:null,
+    gps:null, stream:null, punchedIn:false, punchInTime:null,
+    punchCount:0, history:[]
+  };
+  // Reset login screen
+  document.getElementById('stepGoogle').style.display  = 'flex';
+  document.getElementById('stepDetails').style.display = 'none';
+  showScreen('screenLogin');
+}
+
+// ══════════════════════════════════════════
+//  CHECK TODAY'S PUNCH STATUS FROM SHEET
+// ══════════════════════════════════════════
+
+async function checkPunchStatus() {
+  if (!state.user) return;
+  const banner        = document.getElementById('stateBanner');
+  const bannerText    = document.getElementById('bannerText');
+  const bannerSpinner = document.getElementById('bannerSpinner');
+
+  banner.style.display = 'flex';
+  banner.className = 'state-banner checking';
+  bannerSpinner.style.display = 'inline-block';
+  bannerText.textContent = 'Syncing today\'s attendance from Google Sheets…';
+
+  if (APPS_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
+    setTimeout(() => { banner.style.display = 'none'; }, 1500);
+    return;
+  }
+
+  try {
+    const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'2-digit', year:'numeric' });
+    // Pass BOTH empId and email for dual verification
+    const url = APPS_SCRIPT_URL
+      + '?action=getStatus'
+      + '&empId='    + encodeURIComponent(state.user.id)
+      + '&empEmail=' + encodeURIComponent(state.user.email)
+      + '&date='     + encodeURIComponent(today);
+
+    // redirect:follow required -- Apps Script GET redirects before responding
+    const res  = await fetch(url, { redirect: 'follow' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(pe) {
+      console.error('Apps Script non-JSON:', text.substring(0,200));
+      banner.style.display = 'none';
+      toast('Sync error - redeploy Apps Script.', 'error', 5000);
+      return;
+    }
+
+    if (data.found && data.punchCount > 0) {
+      // Restore punch count and history regardless of last type
+      state.punchCount = data.punchCount;
+      document.getElementById('statPunches').textContent = state.punchCount;
+
+      if (data.history && data.history.length) {
+        state.history = data.history;  // already newest-first from backend
+        renderHistory();
+      }
+
+      // lastPunchType tells us what the LAST punch was
+      const lastType = (data.lastPunchType || '').toUpperCase();
+
+      if (lastType === 'IN') {
+        // Last punch was IN → next expected is OUT
+        state.punchedIn = true;
+        document.getElementById('statusPill').className   = 'status-pill status-in';
+        document.getElementById('statusPill').textContent = 'Punched In';
+        document.getElementById('statPunchIn').textContent = 'Last IN at ' + data.lastPunchTime;
+        banner.className = 'state-banner punched-in';
+        bannerSpinner.style.display = 'none';
+        bannerText.textContent = `✅ Last punch was IN at ${data.lastPunchTime} — capture selfie + GPS to Punch OUT (or IN again for movement tracking).`;
+      } else {
+        // Last punch was OUT → fresh state, both buttons enabled once selfie+GPS ready
+        state.punchedIn = false;
+        document.getElementById('statusPill').className   = 'status-pill status-out';
+        document.getElementById('statusPill').textContent = 'Punched Out';
+        document.getElementById('statPunchIn').textContent = 'Last OUT at ' + data.lastPunchTime;
+        banner.className = 'state-banner';
+        bannerSpinner.style.display = 'none';
+        bannerText.textContent = `🔄 Last punch was OUT at ${data.lastPunchTime}. You can Punch IN again for next site visit.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+      }
+    } else {
+      // No records yet today -- reset display cleanly
+      state.punchCount = 0;
+      state.punchedIn  = false;
+      document.getElementById('statPunches').textContent = '0';
+      document.getElementById('historyList').innerHTML = '<div class="hist-empty">No records yet today</div>';
+      banner.style.display = 'none';
+    }
+    refreshActionBtns();
+  } catch(err) {
+    banner.style.display = 'none';
+    toast('⚠️ Could not sync status. Proceed normally.', '', 4000);
+  }
+}
+
+// ══════════════════════════════════════════
+//  DASHBOARD SETUP
+// ══════════════════════════════════════════
+
+function setupDash() {
+  const u = state.user;
+  document.getElementById('engNameDisplay').textContent = u.name;
+  document.getElementById('engIdDisplay').textContent   = u.id + ' · ' + u.zone;
+
+  const avatar = document.getElementById('engAvatar');
+  if (u.picture) {
+    avatar.innerHTML = `<img src="${u.picture}" alt="profile" />`;
+  } else {
+    avatar.textContent = u.name.charAt(0).toUpperCase();
+  }
+
+  document.getElementById('statZone').textContent = u.zone;
+  const now = new Date();
+  document.getElementById('statDate').textContent = now.toLocaleDateString('en-IN', { day:'2-digit', month:'short' });
+  document.getElementById('statDay').textContent  = now.toLocaleDateString('en-IN', { weekday:'long' });
+  // statPunches NOT set here -- checkPunchStatus() sets it after async fetch
+  refreshActionBtns();
+}
+
+// ══════════════════════════════════════════
+//  CAMERA
+// ══════════════════════════════════════════
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'user', width:{ ideal:640 }, height:{ ideal:480 } }, audio:false
+    });
+    state.stream = stream;
+    const video = document.getElementById('videoEl');
+    video.srcObject = stream; video.style.display = 'block';
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('btnSnap').style.display   = 'block';
+    document.getElementById('btnRetake').style.display = 'none';
+  } catch(e) {
+    toast('⚠️ Camera access denied. Allow camera in browser settings.', 'error', 5000);
+  }
+}
+
+function stopCamera() {
+  if (state.stream) { state.stream.getTracks().forEach(t => t.stop()); state.stream = null; }
+}
+
+function capturePhoto() {
+  const video  = document.getElementById('videoEl');
+  const canvas = document.getElementById('snapCanvas');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  const dataURL = canvas.toDataURL('image/jpeg', 0.82);
+  state.photoDataURL = dataURL;
+  const byteStr = atob(dataURL.split(',')[1]);
+  const ab = new ArrayBuffer(byteStr.length);
+  const ia = new Uint8Array(ab);
+  for (let i=0; i<byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+  state.photoBlob = new Blob([ab], { type:'image/jpeg' });
+
+  const preview = document.getElementById('photoPreview');
+  preview.src = dataURL; preview.style.display = 'block';
+  document.getElementById('videoEl').style.display    = 'none';
+  document.getElementById('btnSnap').style.display    = 'none';
+  document.getElementById('btnRetake').style.display  = 'block';
+  stopCamera();
+  toast('📸 Selfie captured!', 'success');
+  refreshActionBtns();
+}
+
+function retakePhoto() {
+  state.photoBlob = null; state.photoDataURL = null;
+  document.getElementById('photoPreview').style.display  = 'none';
+  document.getElementById('btnRetake').style.display     = 'none';
+  document.getElementById('btnSnap').style.display       = 'block';
+  startCamera();
+  refreshActionBtns();
+}
+
+// ══════════════════════════════════════════
+//  GPS
+// ══════════════════════════════════════════
+
+function getGPS() {
+  const btn     = document.getElementById('btnGps');
+  const display = document.getElementById('gpsDisplay');
+  btn.innerHTML = '<span class="spinner"></span> Acquiring…';
+  btn.disabled  = true;
+
+  if (!navigator.geolocation) {
+    display.textContent = 'Geolocation not supported';
+    btn.innerHTML = '📍 Acquire My Location'; btn.disabled = false; return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude:lat, longitude:lng, accuracy } = pos.coords;
+      state.gps = { lat, lng, accuracy };
+      display.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      document.getElementById('gpsAcc').textContent = `± ${Math.round(accuracy)} meters accuracy`;
+      btn.innerHTML = '✅ Location Acquired';
+      btn.classList.add('acquired'); btn.disabled = false;
+      refreshActionBtns();
+    },
+    (err) => {
+      display.textContent = 'Failed — please enable GPS';
+      btn.innerHTML = '🔄 Retry Location'; btn.disabled = false;
+      toast('⚠️ GPS error: ' + err.message, 'error');
+    },
+    { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+  );
+}
+
+// ══════════════════════════════════════════
+//  ACTION BUTTONS LOGIC
+// ══════════════════════════════════════════
+
+function refreshActionBtns() {
+  const ready = !!(state.photoBlob && state.gps);
+  // Both buttons enabled when selfie+GPS are ready
+  // The only time we restrict:
+  //   - If last punch was IN  → OUT is primary (IN is secondary, still allowed for movement)
+  //   - If last punch was OUT → IN is primary (OUT still allowed edge case)
+  // Since multiple IN/OUT per day is allowed for movement tracking,
+  // we enable BOTH buttons whenever ready. State just affects which is highlighted.
+  document.getElementById('btnPunchIn').disabled  = !ready;
+  document.getElementById('btnPunchOut').disabled = !ready;
+}
+
+// ══════════════════════════════════════════
+//  PUNCH IN / OUT
+// ══════════════════════════════════════════
+
+async function doPunch(type) {
+  if (!state.photoBlob || !state.gps) { toast('⚠️ Capture selfie & GPS first', 'error'); return; }
+
+  const btn = document.getElementById(type === 'IN' ? 'btnPunchIn' : 'btnPunchOut');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> &nbsp;Submitting…`;
+
+  const now       = new Date();
+  const timestamp = now.toISOString();
+  const timeStr   = now.toLocaleTimeString('en-IN',  { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const dateStr   = now.toLocaleDateString('en-IN',  { day:'2-digit', month:'2-digit', year:'numeric' });
+
+  const payload = {
+    action:    'punch',
+    type,
+    empId:     state.user.id,
+    empName:   state.user.name,
+    empEmail:  state.user.email,
+    zone:      state.user.zone,
+    lat:       state.gps.lat,
+    lng:       state.gps.lng,
+    accuracy:  state.gps.accuracy,
+    timestamp, dateStr, timeStr,
+    selfie:    state.photoDataURL
+  };
+
+  try {
+    let result;
+    if (APPS_SCRIPT_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE') {
+      await new Promise(r => setTimeout(r, 1800));
+      result = { success:true, driveLink:'#demo-mode', rowId:'DEMO-'+Date.now() };
+    } else {
+      const res = await fetch(APPS_SCRIPT_URL, { method:'POST', body: JSON.stringify(payload) });
+      result = await res.json();
+    }
+
+    if (result.success) {
+      // Update state based on what was just punched
+      state.punchedIn = (type === 'IN');
+      state.punchCount++;
+      document.getElementById('statPunches').textContent = state.punchCount;
+
+      if (type === 'IN') {
+        state.punchInTime = now;
+        document.getElementById('statusPill').className   = 'status-pill status-in';
+        document.getElementById('statusPill').textContent = 'Punched In';
+        document.getElementById('statPunchIn').textContent = 'Last IN at ' + timeStr;
+        startSessionTimer();
+      } else {
+        clearInterval(state.sessionTimer);
+        document.getElementById('statusPill').className   = 'status-pill status-out';
+        document.getElementById('statusPill').textContent = 'Punched Out';
+        document.getElementById('statPunchIn').textContent = 'Last OUT at ' + timeStr;
+        document.getElementById('statSession').textContent = '–';
+      }
+
+      // Update banner to reflect new state
+      const banner     = document.getElementById('stateBanner');
+      const bannerText = document.getElementById('bannerText');
+      document.getElementById('bannerSpinner').style.display = 'none';
+      banner.style.display = 'flex';
+      if (type === 'IN') {
+        banner.className = 'state-banner punched-in';
+        bannerText.textContent = `✅ Punched IN at ${timeStr}. Punch OUT when leaving site, or IN again at next site.`;
+      } else {
+        banner.className = 'state-banner';
+        bannerText.textContent = `🔄 Punched OUT at ${timeStr}. Punch IN again at your next site visit.`;
+        setTimeout(() => { banner.style.display = 'none'; }, 5000);
+      }
+
+      state.history.unshift({ type, time:timeStr, date:dateStr, lat:state.gps.lat.toFixed(5), lng:state.gps.lng.toFixed(5) });
+      renderHistory();
+
+      // Reset selfie + GPS
+      state.photoBlob = null; state.photoDataURL = null; state.gps = null;
+      retakePhoto();
+      document.getElementById('gpsDisplay').textContent = 'Tap below to acquire GPS…';
+      document.getElementById('gpsAcc').textContent     = '';
+      const gpsBtn = document.getElementById('btnGps');
+      gpsBtn.innerHTML = '📍 Acquire My Location';
+      gpsBtn.classList.remove('acquired');
+
+      showSuccess(type, timeStr, dateStr, result.driveLink);
+    } else {
+      toast('❌ Submission failed. Try again.', 'error');
+    }
+  } catch(e) {
+    toast('❌ Network error. Check connection.', 'error');
+  }
+
+  btn.innerHTML = type === 'IN' ? '✅ &nbsp;Punch IN' : '🔴 &nbsp;Punch OUT';
+  refreshActionBtns();
+}
+
+// ── Session timer ──
+function startSessionTimer() {
+  clearInterval(state.sessionTimer);
+  state.sessionTimer = setInterval(() => {
+    if (!state.punchInTime) return;
+    const diff = Math.floor((new Date() - state.punchInTime) / 1000);
+    const h = String(Math.floor(diff / 3600)).padStart(2,'0');
+    const m = String(Math.floor((diff % 3600) / 60)).padStart(2,'0');
+    const s = String(diff % 60).padStart(2,'0');
+    document.getElementById('statSession').textContent = `${h}:${m}:${s}`;
+  }, 1000);
+}
+
+// ── History ──
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!state.history.length) {
+    list.innerHTML = '<div class="hist-empty">No records yet today</div>'; return;
+  }
+  list.innerHTML = state.history.map(h => `
+    <div class="history-item">
+      <div class="hist-type ${h.type==='IN'?'hist-in':'hist-out'}">${h.type==='IN'?'✅':'🔴'}</div>
+      <div class="hist-info">
+        <div class="hist-action">Punch ${h.type} — ${h.date}</div>
+        <div class="hist-time">${h.time} &nbsp;·&nbsp; ${h.lat}, ${h.lng}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Success overlay ──
+function showSuccess(type, time, date, link) {
+  document.getElementById('successIcon').textContent  = type==='IN' ? '✅' : '🏁';
+  document.getElementById('successTitle').textContent = `Punch ${type} Recorded`;
+  document.getElementById('successSub').textContent   =
+    type==='IN' ? 'Your attendance has been saved. Have a great day!' : 'Day complete! Records saved to Google Sheets.';
+  document.getElementById('successMeta').innerHTML    =
+    `📅 ${date} &nbsp; ⏰ ${time}<br/>` +
+    `📍 ${state.history[0]?.lat||'–'}, ${state.history[0]?.lng||'–'}<br/>` +
+    (link && link!=='#demo-mode' ? `📸 <a href="${link}" target="_blank" style="color:var(--accent)">View Selfie on Drive</a>` : `📸 Selfie uploaded`);
+  document.getElementById('successOverlay').classList.add('show');
+}
+
+function closeSuccess() {
+  document.getElementById('successOverlay').classList.remove('show');
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('load', () => {
+  setTimeout(initGoogleSignIn, 300); // small delay for GSI SDK to load
+});
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
