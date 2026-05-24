@@ -370,7 +370,7 @@ function goToDashboard() {
   .then(function(r) { return r.text(); })
   .then(function(t) {
     var res;
-    try { res = JSON.parse(t); } catch(e) { res = { valid: true }; } // fail open on parse error
+    res = parseLastJSON(t) || { valid: true };
 
     if (btn) { btn.disabled = false; btn.textContent = 'Continue to Dashboard →'; }
 
@@ -384,8 +384,9 @@ function goToDashboard() {
     // Clear any previous error
     document.getElementById('validationError').style.display = 'none';
 
-    // Valid — proceed to dashboard
-    S.user = { id: id, name: S.gUser.name, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
+    // Valid — use name from Employees sheet, not Google account name
+    var displayName = (res.name && res.name.trim()) ? res.name.trim() : S.gUser.name;
+    S.user = { id: id, name: displayName, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
     localStorage.setItem('ft_user', JSON.stringify(S.user));
     saveSession();
     initDash();
@@ -429,6 +430,21 @@ function initDash() {
 }
 
 // ── Sync status from sheet ─────────────────────────────────────
+// Extract last valid JSON object from Apps Script response
+// (redirect sometimes prepends an intermediate JSON blob)
+function parseLastJSON(t) {
+  try {
+    var lastBrace = t.lastIndexOf('{');
+    var str = lastBrace > 0 ? t.slice(lastBrace) : t;
+    var depth = 0, end = -1;
+    for (var i = 0; i < str.length; i++) {
+      if (str[i] === '{') depth++;
+      else if (str[i] === '}') { depth--; if (depth === 0) { end = i+1; break; } }
+    }
+    return JSON.parse(end > 0 ? str.slice(0, end) : str);
+  } catch(e) { return null; }
+}
+
 function syncStatus() {
   var banner = document.getElementById('banner');
   var bText  = document.getElementById('bannerText');
@@ -443,7 +459,8 @@ function syncStatus() {
   .then(function(r){ return r.text(); })
   .then(function(t){
     var data;
-    try { data = JSON.parse(t); } catch(e){ banner.className='banner'; return; }
+    data = parseLastJSON(t);
+    if (!data) { banner.className='banner'; return; }
     if (data.found && data.punchCount > 0) {
       S.punchCount = data.punchCount;
       document.getElementById('tPunches').textContent = S.punchCount;
