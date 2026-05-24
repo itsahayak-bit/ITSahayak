@@ -153,6 +153,7 @@
         <div class="guser-row" id="guserRow"></div>
         <div><div class="field-label">Employee ID</div><input class="field-input" id="empId" type="text" placeholder="e.g. TPO-0042" autocomplete="off"/></div>
         <div><div class="field-label">Zone / Location</div><input class="field-input" id="empZone" type="text" placeholder="e.g. Bhubaneswar North" autocomplete="off"/></div>
+        <div id="validationError" style="display:none;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:12px 14px;font-size:13px;color:#ef4444;line-height:1.5"></div>
         <button class="btn btn-primary" onclick="goToDashboard()">Continue to Dashboard →</button>
         <button class="btn-switch" onclick="switchAccount()">← Use a different account</button>
       </div>
@@ -224,7 +225,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLqs3RFC_Ohe2FKvhu5FXs5XShXVN8GSLbLBD6tbXaksdO__8rIG6Y_0eTeaPqWH4rIQ/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzC9DGyQKtJfmG5akV-9V4ZI-UP0a-pXheLUTCLD11F-F939ULznD9FtGHTtEQpypl0qA/exec';
 const CLIENT_ID  = '876656984570-ufo1njf6qr99nq8il9mr29naptbnnppo.apps.googleusercontent.com';
 const REDIRECT   = location.origin + location.pathname;
 const AUTH_TTL   = 3600000;
@@ -356,13 +357,50 @@ function goToDashboard() {
   var id   = document.getElementById('empId').value.trim();
   var zone = document.getElementById('empZone').value.trim();
   if (!id || !zone) { toast('Please enter Employee ID and Zone.','err'); return; }
-  S.user = { id: id, name: S.gUser.name, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
-  localStorage.setItem('ft_user', JSON.stringify(S.user));
-  saveSession();
-  initDash();
-  startCamera();
-  show('screenDash');
-  syncStatus();
+
+  // Validate Employee ID against Google email in the Employees sheet
+  var btn = document.querySelector('#step2 .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Validating...'; }
+
+  var url = SCRIPT_URL + '?action=validateEmp'
+    + '&empId='    + encodeURIComponent(id)
+    + '&empEmail=' + encodeURIComponent(S.gUser.email);
+
+  fetch(url, { redirect: 'follow' })
+  .then(function(r) { return r.text(); })
+  .then(function(t) {
+    var res;
+    try { res = JSON.parse(t); } catch(e) { res = { valid: true }; } // fail open on parse error
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue to Dashboard →'; }
+
+    if (!res.valid) {
+      // Show error — do NOT proceed
+      document.getElementById('validationError').textContent = res.reason || 'Validation failed. Please check your Employee ID.';
+      document.getElementById('validationError').style.display = 'block';
+      return;
+    }
+
+    // Clear any previous error
+    document.getElementById('validationError').style.display = 'none';
+
+    // Valid — proceed to dashboard
+    S.user = { id: id, name: S.gUser.name, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
+    localStorage.setItem('ft_user', JSON.stringify(S.user));
+    saveSession();
+    initDash();
+    startCamera();
+    show('screenDash');
+    syncStatus();
+  })
+  .catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = 'Continue to Dashboard →'; }
+    // On network error — fail open and proceed
+    S.user = { id: id, name: S.gUser.name, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
+    localStorage.setItem('ft_user', JSON.stringify(S.user));
+    saveSession();
+    initDash(); startCamera(); show('screenDash'); syncStatus();
+  });
 }
 
 function signOut() {
