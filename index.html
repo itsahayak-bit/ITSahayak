@@ -262,6 +262,13 @@ function show(id) {
 //  GOOGLE OAUTH — Direct redirect flow (no popup, no GSI lib)
 // ══════════════════════════════════════════════════════════════
 
+// Generate cryptographic nonce for ID token security
+function generateNonce() {
+  var arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
 function signInWithGoogle() {
   var btn = document.getElementById('googleBtn');
   btn.disabled = true;
@@ -269,11 +276,15 @@ function signInWithGoogle() {
   // Save current empId/zone if user already filled them
   sessionStorage.setItem('ft_emp_id',   document.getElementById('empId').value);
   sessionStorage.setItem('ft_emp_zone', document.getElementById('empZone').value);
+  // Generate and store nonce — required for id_token, prevents replay attacks
+  var nonce = generateNonce();
+  sessionStorage.setItem('ft_nonce', nonce);
   var url = 'https://accounts.google.com/o/oauth2/v2/auth' +
     '?client_id='     + encodeURIComponent(CLIENT_ID) +
     '&redirect_uri='  + encodeURIComponent(REDIRECT) +
-    '&response_type=token' +
-    '&scope='         + encodeURIComponent('profile email') +
+    '&response_type=' + encodeURIComponent('token id_token') +
+    '&scope='         + encodeURIComponent('profile email openid') +
+    '&nonce='         + encodeURIComponent(nonce) +
     '&prompt=select_account';
   location.href = url;
 }
@@ -291,6 +302,10 @@ function handleOAuthReturn() {
   var params = {};
   hash.split('&').forEach(function(p){ var kv=p.split('='); params[kv[0]]=decodeURIComponent(kv[1]||''); });
   if (!params.access_token) return false;
+  // Store id_token in sessionStorage for backend verification
+  if (params.id_token) {
+    localStorage.setItem('ft_id_token', params.id_token);
+  }
   // Clean up URL
   history.replaceState(null, '', location.pathname);
   // Fetch user profile with the token
@@ -328,9 +343,15 @@ function showStep2() {
 }
 
 // ── Session save / restore ─────────────────────────────────────
+// Get stored id_token — included with every backend request
+function getIdToken() {
+  return localStorage.getItem('ft_id_token') || '';
+}
+
 function saveSession() {
   if (!S.gUser || !S.user) return;
-  localStorage.setItem('ft_session', JSON.stringify({ gUser: S.gUser, user: S.user, savedAt: Date.now() }));
+  var token = getIdToken();
+  localStorage.setItem('ft_session', JSON.stringify({ gUser: S.gUser, user: S.user, savedAt: Date.now(), idToken: token }));
 }
 
 function loadSession() {
@@ -347,6 +368,8 @@ function loadSession() {
     }
     S.gUser = sess.gUser;
     S.user  = sess.user;
+    // Restore id_token if saved
+    if (sess.idToken) localStorage.setItem('ft_id_token', sess.idToken);
     return true;
   } catch(e) { localStorage.removeItem('ft_session'); return false; }
 }
@@ -364,7 +387,8 @@ function goToDashboard() {
 
   var url = SCRIPT_URL + '?action=validateEmp'
     + '&empId='    + encodeURIComponent(id)
-    + '&empEmail=' + encodeURIComponent(S.gUser.email);
+    + '&empEmail=' + encodeURIComponent(S.gUser.email)
+    + '&idToken='  + encodeURIComponent(getIdToken());
 
   fetch(url, { redirect: 'follow' })
   .then(function(r) { return r.text(); })
@@ -374,6 +398,13 @@ function goToDashboard() {
 
     if (btn) { btn.disabled = false; btn.textContent = 'Continue to Dashboard →'; }
 
+    if (res.code === 401) {
+      // Token expired — clear it and ask user to sign in again via Google
+      localStorage.removeItem('ft_id_token');
+      document.getElementById('validationError').textContent = 'Your Google session expired. Please click "Use a different account" and sign in again.';
+      document.getElementById('validationError').style.display = 'block';
+      return;
+    }
     if (!res.valid) {
       // Show error — do NOT proceed
       document.getElementById('validationError').textContent = res.reason || 'Validation failed. Please check your Employee ID.';
@@ -406,7 +437,7 @@ function goToDashboard() {
 
 function signOut() {
   stopCamera(); clearInterval(S.sessionTimer);
-  localStorage.removeItem('ft_session'); localStorage.removeItem('ft_user');
+  localStorage.removeItem('ft_session'); localStorage.removeItem('ft_user'); localStorage.removeItem('ft_id_token');
   S = { gUser:null, user:null, photoBlob:null, photoDataURL:null, gps:null, stream:null, punchedIn:false, punchInTime:null, punchCount:0, sessionTimer:null, history:[] };
   document.getElementById('step1').style.display = 'flex';
   document.getElementById('step2').style.display = 'none';
@@ -469,13 +500,21 @@ function syncStatus() {
   bText.textContent = "Syncing today's attendance...";
   var today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
   var url = SCRIPT_URL + '?action=getStatus&empId=' + encodeURIComponent(S.user.id) +
-            '&empEmail=' + encodeURIComponent(S.user.email) + '&date=' + encodeURIComponent(today);
+            '&empEmail=' + encodeURIComponent(S.user.email) + '&date=' + encodeURIComponent(today)
+            + '&idToken=' + encodeURIComponent(getIdToken());
   fetch(url, {redirect:'follow'})
   .then(function(r){ return r.text(); })
   .then(function(t){
     var data;
     data = parseLastJSON(t, 'found');
     if (!data) { banner.className='banner'; return; }
+    // Handle expired token — ask engineer to sign in again
+    if (data.code === 401) {
+      banner.className='banner';
+      toast('Session expired. Please sign in again.', 'err', 5000);
+      setTimeout(function(){ signOut(); }, 2000);
+      return;
+    }
     if (data.found && data.punchCount > 0) {
       S.punchCount = data.punchCount;
       document.getElementById('tPunches').textContent = S.punchCount;
@@ -501,7 +540,10 @@ function syncStatus() {
     }
     refreshBtns();
   })
-  .catch(function(){ banner.className='banner'; });
+  .catch(function(e){ 
+    console.error('syncStatus error:', e);
+    banner.className='banner'; 
+  });
 }
 
 // ── Camera ─────────────────────────────────────────────────────
@@ -579,6 +621,7 @@ function doPunch(type) {
   var dStr= now.toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
   var payload={
     action:'punch', type:type,
+    idToken: getIdToken(),
     empId:S.user.id, empName:S.user.name, empEmail:S.user.email, zone:S.user.zone,
     lat:S.gps.lat, lng:S.gps.lng, accuracy:S.gps.acc,
     timestamp:ts, dateStr:dStr, timeStr:tStr,
@@ -588,6 +631,12 @@ function doPunch(type) {
   .then(function(r){ return r.text(); })
   .then(function(t){
     var res; try{ res=JSON.parse(t); }catch(e){ res={success:false}; }
+    if (res.code === 401) {
+      toast('Session expired. Please sign in again.', 'err', 5000);
+      setTimeout(function(){ signOut(); }, 2000);
+      btn.innerHTML = type==='IN'?'✅ &nbsp;Punch IN':'🔴 &nbsp;Punch OUT';
+      refreshBtns(); return;
+    }
     if (res.success) {
       S.punchedIn=(type==='IN'); S.punchCount++;
       document.getElementById('tPunches').textContent=S.punchCount;
