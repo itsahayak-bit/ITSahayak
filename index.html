@@ -120,6 +120,25 @@
     .s-sub{color:var(--muted);font-size:14px;line-height:1.5}
     .s-meta{margin-top:20px;padding:14px;background:var(--bg);border-radius:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);line-height:1.8;text-align:left}
     .btn-done{margin-top:20px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),#0099cc);border:none;border-radius:12px;color:#000;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;cursor:pointer}
+
+    /* ── Travel Tracking Section ─────────────── */
+    .travel-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .travel-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)}
+    .travel-stat{background:var(--surface);padding:14px 8px;text-align:center}
+    .travel-stat-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)}
+    .travel-stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:3px}
+    .travel-log{max-height:240px;overflow-y:auto}
+    .travel-item{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .travel-item:last-child{border-bottom:none}
+    .travel-seq{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+    .travel-info{flex:1;min-width:0}
+    .travel-time{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace}
+    .travel-coords{font-size:11px;color:var(--muted);margin-top:1px}
+    .travel-road{font-size:11px;color:var(--muted);margin-top:1px}
+    .travel-dist{font-size:12px;font-weight:700;color:var(--success);text-align:right;flex-shrink:0;white-space:nowrap}
+    .travel-first{color:var(--muted);font-size:11px;font-weight:400}
+    .travel-empty{padding:20px;text-align:center;color:var(--muted);font-size:13px}
+    .travel-syncing{padding:14px;text-align:center;color:var(--accent);font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
   </style>
 </head>
 <body>
@@ -202,7 +221,28 @@
       <button class="btn btn-punch-in" id="btnIn" onclick="doPunch('IN')" disabled>✅ &nbsp;Punch IN</button>
       <button class="btn btn-punch-out" id="btnOut" onclick="doPunch('OUT')" disabled>🔴 &nbsp;Punch OUT</button>
     </div>
-    <div class="section-label">📋 Today's Log</div>
+    <div class="section-label">🗺️ Today's Travel</div>
+    <div class="travel-card">
+      <div class="travel-stats">
+        <div class="travel-stat">
+          <div class="travel-stat-val" id="tSites">0</div>
+          <div class="travel-stat-label">Sites Visited</div>
+        </div>
+        <div class="travel-stat">
+          <div class="travel-stat-val" id="tKm">0.0</div>
+          <div class="travel-stat-label">km Travelled</div>
+        </div>
+        <div class="travel-stat">
+          <div class="travel-stat-val" id="tTA">₹0</div>
+          <div class="travel-stat-label">TA Earned</div>
+        </div>
+      </div>
+      <div class="travel-log" id="travelLog">
+        <div class="travel-empty">Punch IN at each site to track travel</div>
+      </div>
+    </div>
+
+        <div class="section-label">📋 Today's Log</div>
     <div class="hist-card">
       <div class="hist-header">Attendance History</div>
       <div class="hist-list" id="histList"><div class="hist-empty">No records yet today</div></div>
@@ -424,6 +464,7 @@ function goToDashboard() {
     startCamera();
     show('screenDash');
     syncStatus();
+    syncTravelLog();
   })
   .catch(function() {
     if (btn) { btn.disabled = false; btn.textContent = 'Continue to Dashboard →'; }
@@ -431,7 +472,7 @@ function goToDashboard() {
     S.user = { id: id, name: S.gUser.name, email: S.gUser.email, picture: S.gUser.picture, zone: zone };
     localStorage.setItem('ft_user', JSON.stringify(S.user));
     saveSession();
-    initDash(); startCamera(); show('screenDash'); syncStatus();
+    initDash(); startCamera(); show('screenDash'); syncStatus(); syncTravelLog();
   });
 }
 
@@ -638,6 +679,8 @@ function doPunch(type) {
       refreshBtns(); return;
     }
     if (res.success) {
+      // Update travel UI after Punch IN
+      if (type === 'IN' && res.travel) updateTravelFromPunch(res.travel);
       S.punchedIn=(type==='IN'); S.punchCount++;
       document.getElementById('tPunches').textContent=S.punchCount;
       if(type==='IN'){ S.punchInTime=now; setPill(true); startTimer();
@@ -687,6 +730,85 @@ function startTimer() {
     document.getElementById('tSession').textContent=h+':'+m+':'+s;
   },1000);
 }
+// ── Travel Tracking ─────────────────────────────────────────────
+function syncTravelLog() {
+  var tLog = document.getElementById('travelLog');
+  if (!tLog) return;
+  tLog.innerHTML = '<div class="travel-syncing"><span class="spinner"></span> Loading travel data...</div>';
+
+  var today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  var url = SCRIPT_URL + '?action=getTravelLog'
+    + '&empId='    + encodeURIComponent(S.user.id)
+    + '&empEmail=' + encodeURIComponent(S.user.email)
+    + '&date='     + encodeURIComponent(today);
+
+  fetch(url, {redirect:'follow'})
+  .then(function(r){ return r.text(); })
+  .then(function(t){
+    var data = parseLastJSON(t, 'waypoints');
+    if (!data) { renderTravelLog(null); return; }
+    updateTravelStats(data.siteCount||0, data.totalKm||0, data.taAmount||0);
+    renderTravelLog(data.waypoints||[]);
+  })
+  .catch(function(){ renderTravelLog(null); });
+}
+
+function updateTravelStats(sites, km, ta) {
+  var sEl = document.getElementById('tSites');
+  var kEl = document.getElementById('tKm');
+  var tEl = document.getElementById('tTA');
+  if (sEl) sEl.textContent = sites;
+  if (kEl) kEl.textContent = parseFloat(km).toFixed(1);
+  if (tEl) tEl.textContent = '₹' + parseFloat(ta).toFixed(0);
+}
+
+function renderTravelLog(waypoints) {
+  var tLog = document.getElementById('travelLog');
+  if (!tLog) return;
+
+  if (!waypoints || waypoints.length === 0) {
+    tLog.innerHTML = '<div class="travel-empty">Punch IN at each site to track travel</div>';
+    return;
+  }
+
+  var html = '';
+  waypoints.forEach(function(w) {
+    var isFirst = (w.seq === 1 || w.distKm === 0);
+    var distHtml = isFirst
+      ? '<div class="travel-dist travel-first">Start</div>'
+      : '<div class="travel-dist">+' + parseFloat(w.distKm).toFixed(1) + ' km</div>';
+    var roadHtml = (!isFirst && w.details)
+      ? '<div class="travel-road">' + w.details + '</div>'
+      : '';
+    html += '<div class="travel-item" style="cursor:pointer" onclick="openMapsLink(' + JSON.stringify(w.mapsLink) + ')">'
+      + '<div class="travel-seq">' + w.seq + '</div>'
+      + '<div class="travel-info">'
+      + '<div class="travel-time">' + (w.time||'--') + '</div>'
+      + '<div class="travel-coords">' + (w.lat||'') + ', ' + (w.lng||'') + '</div>'
+      + roadHtml
+      + '</div>'
+      + distHtml
+      + '</div>';
+  });
+  tLog.innerHTML = html;
+}
+
+function openMapsLink(url) {
+  if (url) window.open(url, '_blank');
+}
+
+// Update travel stats live after each Punch IN (without full refetch)
+function updateTravelFromPunch(travelResult) {
+  if (!travelResult) return;
+  updateTravelStats(
+    travelResult.sequence  || 0,
+    travelResult.totalKm   || 0,
+    travelResult.taAmount  || 0
+  );
+  // Full refresh to get road details from server
+  setTimeout(syncTravelLog, 1500);
+}
+
 function renderHistory() {
   var list=document.getElementById('histList');
   if(!S.history.length){ list.innerHTML='<div class="hist-empty">No records yet today</div>'; return; }
@@ -706,7 +828,7 @@ function renderHistory() {
   }
   // 2. Check saved session
   if (loadSession()) {
-    initDash(); startCamera(); show('screenDash'); syncStatus();
+    initDash(); startCamera(); show('screenDash'); syncStatus(); syncTravelLog();
     return;
   }
   // 3. No session — show login
