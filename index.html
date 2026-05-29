@@ -137,6 +137,7 @@
     .travel-road{font-size:11px;color:var(--muted);margin-top:1px}
     .travel-dist{font-size:12px;font-weight:700;color:var(--success);text-align:right;flex-shrink:0;white-space:nowrap}
     .travel-first{color:var(--muted);font-size:11px;font-weight:400}
+    .travel-filtered{color:var(--muted);font-size:11px;font-weight:400;text-decoration:line-through}
     .travel-empty{padding:20px;text-align:center;color:var(--muted);font-size:13px}
     .travel-syncing{padding:14px;text-align:center;color:var(--accent);font-size:13px;display:flex;align-items:center;justify-content:center;gap:8px}
   </style>
@@ -699,7 +700,7 @@ function doPunch(type) {
       // Show success
       document.getElementById('sIcon').textContent=type==='IN'?'✅':'🏁';
       document.getElementById('sTitle').textContent='Punch '+type+' Recorded';
-      document.getElementById('sSub').textContent=type==='IN'?'Your attendance has been saved!':'Day complete! See you tomorrow.';
+      document.getElementById('sSub').textContent=type==='IN'?'Morning attendance saved!':'Day complete! See you tomorrow.';
       document.getElementById('sMeta').innerHTML='📅 '+dStr+' &nbsp; ⏰ '+tStr+'<br/>📍 '+S.history[0].lat+', '+S.history[0].lng+(res.driveLink&&res.driveLink!=='No selfie received'?'<br/>📸 <a href="'+res.driveLink+'" target="_blank" style="color:var(--accent)">View Selfie</a>':'');
       document.getElementById('successOverlay').classList.add('show');
     } else { toast('Submission failed. Try again.','err'); }
@@ -773,19 +774,49 @@ function renderTravelLog(waypoints) {
 
   var html = '';
   waypoints.forEach(function(w) {
-    var isFirst = (w.seq === 1 || w.distKm === 0);
-    var distHtml = isFirst
-      ? '<div class="travel-dist travel-first">Start</div>'
-      : '<div class="travel-dist">+' + parseFloat(w.distKm).toFixed(1) + ' km</div>';
-    var roadHtml = (!isFirst && w.details)
+    var isFirst  = (w.seq === 1);
+    var counted  = (!w.filterResult || w.filterResult === 'COUNTED');
+    var filtered = !isFirst && !counted;
+
+    // Distance display
+    var distHtml;
+    if (isFirst) {
+      distHtml = '<div class="travel-dist travel-first">Start</div>';
+    } else if (counted) {
+      distHtml = '<div class="travel-dist">+' + parseFloat(w.distKm).toFixed(1) + ' km</div>';
+    } else {
+      distHtml = '<div class="travel-dist travel-filtered">0 km</div>';
+    }
+
+    // Filter reason tag
+    var filterTag = '';
+    if (filtered && w.filterResult) {
+      var tagColors = {
+        GEOFENCE:  'background:rgba(29,78,216,0.12);color:#1d4ed8',
+        SPEED:     'background:rgba(194,65,12,0.12);color:#c2410c',
+        ACCURACY:  'background:rgba(185,28,28,0.12);color:#b91c1c',
+        THRESHOLD: 'background:rgba(107,114,128,0.12);color:#6b7280'
+      };
+      var tagStyle = tagColors[w.filterResult] || 'background:rgba(107,114,128,0.12);color:#6b7280';
+      filterTag = '<div style="font-size:9px;padding:2px 6px;border-radius:3px;margin-top:2px;display:inline-block;' + tagStyle + '">'
+        + w.filterResult + (w.filterReason ? ' · ' + w.filterReason.split(' — ')[0] : '') + '</div>';
+    }
+
+    var roadHtml = (counted && !isFirst && w.details)
       ? '<div class="travel-road">' + w.details + '</div>'
       : '';
-    html += '<div class="travel-item" style="cursor:pointer" onclick="openMapsLink(' + JSON.stringify(w.mapsLink) + ')">'
-      + '<div class="travel-seq">' + w.seq + '</div>'
+
+    var rowStyle = filtered
+      ? 'opacity:0.6;'
+      : '';
+
+    html += '<div class="travel-item" style="cursor:pointer;' + rowStyle + '" onclick="openMapsLink(' + JSON.stringify(w.mapsLink) + ')">'
+      + '<div class="travel-seq" style="' + (filtered ? 'background:#9ca3af' : '') + '">' + w.seq + '</div>'
       + '<div class="travel-info">'
       + '<div class="travel-time">' + (w.time||'--') + '</div>'
       + '<div class="travel-coords">' + (w.lat||'') + ', ' + (w.lng||'') + '</div>'
       + roadHtml
+      + filterTag
       + '</div>'
       + distHtml
       + '</div>';
