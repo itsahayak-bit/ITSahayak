@@ -700,7 +700,7 @@ function doPunch(type) {
       // Show success
       document.getElementById('sIcon').textContent=type==='IN'?'✅':'🏁';
       document.getElementById('sTitle').textContent='Punch '+type+' Recorded';
-      document.getElementById('sSub').textContent=type==='IN'?'Morning attendance saved!':'Day complete! See you tomorrow.';
+      document.getElementById('sSub').textContent=type==='IN'?'Your attendance has been saved!':'Day complete! See you tomorrow.';
       document.getElementById('sMeta').innerHTML='📅 '+dStr+' &nbsp; ⏰ '+tStr+'<br/>📍 '+S.history[0].lat+', '+S.history[0].lng+(res.driveLink&&res.driveLink!=='No selfie received'?'<br/>📸 <a href="'+res.driveLink+'" target="_blank" style="color:var(--accent)">View Selfie</a>':'');
       document.getElementById('successOverlay').classList.add('show');
     } else { toast('Submission failed. Try again.','err'); }
